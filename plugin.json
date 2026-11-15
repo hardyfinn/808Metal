@@ -1,0 +1,23 @@
+{
+  "slug": "808Metal",
+  "name": "808 Metal",
+  "version": "2.0.0",
+  "license": "GPL-3.0-or-later",
+  "brand": "Haer",
+  "author": "Haer",
+  "authorEmail": "",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "https://github.com/hardyfinn/808metal",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "808Metal",
+      "name": "808 Metal",
+      "description": "TR-808 cymbal and hi-hat circuit model (six square oscillators, bandpass pair, three swing VCAs and highpass filters), after mjsyts' hardware-accurate model on scsynth.org, with tuning, filter, envelope and drive controls",
+      "tags": ["Drum", "Synth voice", "Hardware clone"]
+    }
+  ]
+}
