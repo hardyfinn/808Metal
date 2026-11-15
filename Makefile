@@ -6,7 +6,9 @@ SOURCES += $(wildcard src/*.cpp)
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
 
+ifneq ($(MAKECMDGOALS),test)
 include $(RACK_DIR)/plugin.mk
+endif
 
 # Engine checks, no Rack SDK needed
 test:
