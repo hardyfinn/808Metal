@@ -44,4 +44,4 @@ Builds for Apple Silicon Macs run on GitHub Actions on every push (`.github/work
 "preview" release, `main` to "latest". `make test` runs the engine checks without the Rack SDK.
 Panel: `python3 res/make_panel.py` (needs fonttools and Inter), preview picture: `python3 tools/preview.py out.png`.
 
-Licence: GPL-3.0-or-later.
+Licence: GPL-3.0-or-later (full text in `LICENSE.txt`). Copyright (C) 2026 Haer. It stays GPL until mjsyts, whose circuit model this follows, is asked about a more permissive licence.
