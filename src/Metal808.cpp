@@ -81,7 +81,7 @@ struct Metal808 : Module {
 		getParamQuantity(MODE_PARAM)->snapEnabled = true;
 		configParam(TONE_PARAM, -1.f, 1.f, 0.f, "Tone (low path <-> high paths)");
 		configParam(DRIVE_PARAM, 0.f, 1.f, 0.f, "Drive (VCA clipping)", "%", 0.f, 100.f);
-		configParam(LEVEL_PARAM, 0.f, 1.f, 1.f, "Level", "%", 0.f, 100.f);
+		configParam(LEVEL_PARAM, 0.f, 1.f, 1.f, "Level", "%", 0.f, 100.f)->randomizeEnabled = false;
 		configButton(HIT_PARAM, "Hit");
 
 		configInput(VOCT_INPUT, "V/OCT (all six oscillators)");
