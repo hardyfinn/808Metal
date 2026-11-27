@@ -104,7 +104,7 @@ The 808's filters and VCAs chop it into metallic hats. With a loop on EXT IN and
 "808-ified" version of the loop.</div>
 
 <h2>Notes</h2>
-<p class="small">Levels: peaks reach about 7 V at default settings, and the output never goes past ±12 V.
+<p class="small">Levels: peaks reach about 7.5 V at default settings. Above 8 V a gentle limiter rounds the peaks off.
 OSC OUT is about ±4.5 V. The engine runs at twice your sample rate (oversampled), so the highest filters stay accurate.
 CPU use is tiny (well under 1 % of one core).</p>
 </body></html>"""

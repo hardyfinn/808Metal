@@ -208,7 +208,8 @@ struct Engine {
 	// cached filter settings so coefficients are only recomputed on change
 	float lastColour = 1e9f, lastRes = -1, lastCut = 1e9f;
 	int counter = 0;
-	float freqs[6];
+	float freqs[6];       // oscillator pitches before TUNE
+	float tuneMul = 1.f;  // 2^(TUNE + V/OCT)
 	float decayCoef[3] = {0, 0, 0};
 	float oscOut = 0.f;
 
@@ -219,19 +220,29 @@ struct Engine {
 	// The engine runs at twice the host rate (oversampled): the 7.1 kHz
 	// band and the resonant 10 kHz highpass then stay true to the model,
 	// and the oscillators alias less. process() returns one host sample.
-	Biquad down[2];
+	// Decimation filter: 10th-order elliptic lowpass, flat (0.03 dB) up to
+	// 0.45 x host rate and 80 dB down from 0.55 x host rate. Its shape is
+	// fixed relative to the sample rate, so the coefficients are constants.
+	static const int DOWN_N = 5;
+	Biquad down[DOWN_N];
 	void setSampleRate(double sr) {
 		if (2.0 * sr == fs) return;
 		fs = 2.0 * sr;
-		// 4th-order Butterworth lowpass at 0.42 x host rate, for decimation
-		double wc = 2 * PI * 0.42 * sr;
-		double K = warpK(wc, fs);
-		const double qs[2] = {0.5411961, 1.3065630};
-		for (int i = 0; i < 2; i++) {
-			down[i].setAnalog2(0, 0, wc * wc, wc / qs[i], wc * wc, K);
+		static const double SOS[DOWN_N][5] = {
+			{0.006239591302255564, 0.011532178948086235, 0.006239591302255563, -0.8774056468445723, 0.23785681743522824},
+			{1.0, 1.0838381013001215, 1.0, -0.6853324486581239, 0.4385402108850066},
+			{1.0, 0.4845641092500529, 1.0, -0.46878300492025404, 0.6706994701368123},
+			{1.0, 0.18382983694067492, 1.0, -0.3263594980778952, 0.8397270565029596},
+			{1.0, 0.06612397614882357, 1.0, -0.26563891774507076, 0.9524009056292381},
+		};
+		for (int i = 0; i < DOWN_N; i++) {
+			down[i].b0 = SOS[i][0]; down[i].b1 = SOS[i][1]; down[i].b2 = SOS[i][2];
+			down[i].a1 = SOS[i][3]; down[i].a2 = SOS[i][4];
 			down[i].reset();
 		}
-		lastColour = 1e9f;  // force a recompute
+		// force every filter to be re-tuned for the new rate
+		lastColour = 1e9f;
+		lastCut = 1e9f;
 		for (auto& b : bpf) b.reset();
 		for (auto& h : hpf) h.reset();
 	}
@@ -278,8 +289,8 @@ struct Engine {
 			float& d = driftState[i];
 			d += -d * 0.6f * dt + rng.normal() * 0.9f * std::sqrt(dt);
 			float cents = c.drift * 40.f * d;
-			float l = lg + (std::log2(base[i]) - lg) * stretch + c.tune + cents / 1200.f;
-			freqs[i] = std::min(std::pow(2.f, l), 0.4f * (float) fs);
+			float l = lg + (std::log2(base[i]) - lg) * stretch + cents / 1200.f;
+			freqs[i] = std::pow(2.f, l);
 		}
 		// envelope decay coefficients (exponential, -35 dB at the decay time)
 		int m = std::min(std::max(c.mode, 0), 2);
@@ -291,23 +302,37 @@ struct Engine {
 		}
 	}
 
+	// Gentle limiter: untouched below 8 V, then bends smoothly towards 10.5 V
+	// (the decimation filter can ring a little above that, never past 12.5 V).
+	static inline float limit(float x) {
+		float a = std::fabs(x);
+		if (a <= 8.f) return x;
+		float y = 8.f + 2.5f * std::tanh((a - 8.f) / 2.5f);
+		return x < 0.f ? -y : y;
+	}
+
 	float process(const Controls& c) {
+		// TUNE / V/OCT is applied per sample, so audio-rate FM works
+		tuneMul = std::exp2(std::min(std::max(c.tune, -8.f), 8.f));
 		double y = 0;
-		for (int i = 0; i < 2; i++)
-			y = down[1].process(down[0].process(processInner(c)));
-		return (float) std::min(std::max(y, -12.0), 12.0);
+		for (int i = 0; i < 2; i++) {
+			y = limit(processInner(c));
+			for (int k = 0; k < DOWN_N; k++) y = down[k].process(y);
+		}
+		return (float) y;
 	}
 
 	float processInner(const Controls& c) {
 		float st = 1.f / (float) fs;
 		if (counter-- <= 0) {
-			counter = 31;
-			updateControl(c, 32.f * st);
+			counter = 7;  // filters, drift and decay follow their CVs every 4 host samples
+			updateControl(c, 8.f * st);
 		}
 		// oscillators
 		float pw = std::min(std::max(c.pw, 0.05f), 0.95f);
 		float s = 0.f;
-		for (int i = 0; i < 6; i++) s += osc[i].process(freqs[i], pw, st);
+		const float fmax = 0.4f * (float) fs;
+		for (int i = 0; i < 6; i++) s += osc[i].process(std::min(freqs[i] * tuneMul, fmax), pw, st);
 		s *= OSC_SCALE;
 		oscOut = s;
 		if (c.useExt) s = c.ext * 0.1f;

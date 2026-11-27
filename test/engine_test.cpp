@@ -104,7 +104,35 @@ int main() {
 		e.trigger(1.f);
 		for (int i = 0; i < 44100; i++) { float y = e.process(c); nan |= !std::isfinite(y); peak = std::max(peak, (double) std::fabs(y)); }
 		printf("extremes peak %.2f\n", peak);
-		CHECK(!nan && peak <= 12, "extreme settings misbehave (peak %.2f)", peak);
+		CHECK(!nan && peak <= 12.5, "extreme settings misbehave (peak %.2f)", peak);
+	}
+	// a sample-rate change re-tunes every filter (2.0.0 left the highpasses behind)
+	{
+		Engine a; Controls c; a.setSampleRate(44100);
+		for (int i = 0; i < 100; i++) a.process(c);
+		a.setSampleRate(96000);
+		for (int i = 0; i < 100; i++) a.process(c);
+		Engine b; b.setSampleRate(96000);
+		for (int i = 0; i < 100; i++) b.process(c);
+		double w = 2 * PI * 10300.0 / a.fs;
+		double ma = std::abs(biq(a.hpf[2].sos, w) * biq(a.hpf[2].fos, w)), mb = std::abs(biq(b.hpf[2].sos, w) * biq(b.hpf[2].fos, w));
+		CHECK(std::fabs(20 * std::log10(ma / mb)) < 0.01, "highpass not re-tuned after a sample-rate change");
+		// decimation filter: flat in the audio band, deep above it
+		cd lo = 1, hi = 1;
+		for (int k = 0; k < Engine::DOWN_N; k++) { lo *= biq(b.down[k], 2 * PI * 0.40 / 2); hi *= biq(b.down[k], 2 * PI * 0.56 / 2); }
+		printf("decimator: %.2f dB at 0.40 x rate, %.1f dB at 0.56 x rate\n", 20 * std::log10(std::abs(lo)), 20 * std::log10(std::abs(hi)));
+		CHECK(std::fabs(20 * std::log10(std::abs(lo))) < 0.1 && 20 * std::log10(std::abs(hi)) < -70, "decimation filter off");
+	}
+	// V/OCT follows per sample: +1 V doubles the pitch of the raw oscillators
+	{
+		Engine e; e.setSampleRate(48000); Controls c; c.trimA = 800; 
+		int zc[2] = {0, 0};
+		for (int v = 0; v < 2; v++) {
+			c.tune = v; float prev = 0;
+			for (int i = 0; i < 48000; i++) { e.process(c); float o = e.oscOut; if (i > 100 && prev <= 0 && o > 0) zc[v]++; prev = o; }
+		}
+		printf("osc zero crossings at 0 V: %d, at +1 V: %d\n", zc[0], zc[1]);
+		CHECK(zc[1] > zc[0] * 1.7, "V/OCT does not shift the oscillators");
 	}
 	// choke
 	{
