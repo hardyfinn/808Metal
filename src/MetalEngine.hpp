@@ -167,6 +167,20 @@ enum Mode { MODE_CH = 0, MODE_OH = 1, MODE_CY = 2 };
 static const float DECAY_LO[3] = {0.02f, 0.09f, 0.35f};
 static const float DECAY_HI[3] = {0.15f, 0.60f, 1.20f};
 // how much shorter the middle and top paths decay than the lowest one
+// Circuit voicing (after Werner, Abel & Smith, "The TR-808 Cymbal", ICMC 2014):
+// the DECAY pot only acts on the first path's envelope; the other two paths
+// have fixed decays. The paper gives no part values, so these fixed times
+// (seconds) are estimates. Closed hat: all three follow the knob.
+static const float FIXED_DECAY[3][2] = {
+	{0.f, 0.f},
+	{0.14f, 0.07f},
+	{0.26f, 0.11f},
+};
+// Output stage: rises 6 dB per octave across the audio band. Modelled as a
+// shelf from TILT_LO to TILT_HI, with unity gain at TILT_REF (estimates).
+static const double TILT_LO = 2000.0, TILT_HI = 12000.0, TILT_REF = 10000.0;
+
+// Classic voicing (2.0-2.2): DECAY scales all three paths by these ratios.
 static const float BAND_RATIO[3][3] = {
 	{1.f, 1.f, 1.f},
 	{1.f, 0.7f, 0.5f},
@@ -190,6 +204,7 @@ struct Controls {
 	float drive = 0.f;       // 0..1
 	float level = 1.f;
 	bool oneEnvelope = false; // all three paths share one decay (as in the post)
+	bool classic = false;     // 2.0-2.2 voicing: see BAND_RATIO, TONE crossfade, no output tilt
 	bool useExt = false;
 	float ext = 0.f;          // external audio (V), replaces the oscillators
 };
@@ -225,6 +240,7 @@ struct Engine {
 	// fixed relative to the sample rate, so the coefficients are constants.
 	static const int DOWN_N = 5;
 	Biquad down[DOWN_N];
+	Biquad tilt;
 	void setSampleRate(double sr) {
 		if (2.0 * sr == fs) return;
 		fs = 2.0 * sr;
@@ -243,6 +259,13 @@ struct Engine {
 		// force every filter to be re-tuned for the new rate
 		lastColour = 1e9f;
 		lastCut = 1e9f;
+		// output tilt: g (s + wz) / (s + wp), unity at TILT_REF
+		{
+			double wz = 2 * PI * TILT_LO, wp = 2 * PI * TILT_HI, wr = 2 * PI * TILT_REF;
+			double g = std::sqrt((wr * wr + wp * wp) / (wr * wr + wz * wz));
+			tilt.setAnalog1(g, g * wz, wp, warpK(wp, fs));
+			tilt.reset();
+		}
 		for (auto& b : bpf) b.reset();
 		for (auto& h : hpf) h.reset();
 	}
@@ -296,8 +319,12 @@ struct Engine {
 		int m = std::min(std::max(c.mode, 0), 2);
 		float d = DECAY_LO[m] * std::pow(DECAY_HI[m] / DECAY_LO[m], std::min(std::max(c.decay, 0.f), 1.f));
 		for (int b = 0; b < 3; b++) {
-			float ratio = c.oneEnvelope ? 1.f : BAND_RATIO[m][b];
-			float tau = d * ratio / 4.f;
+			float t = d;
+			if (!c.oneEnvelope) {
+				if (c.classic) t = d * BAND_RATIO[m][b];
+				else if (b > 0 && m != MODE_CH) t = std::min(FIXED_DECAY[m][b - 1], d);
+			}
+			float tau = t / 4.f;
 			decayCoef[b] = std::exp(-1.f / (tau * (float) fs));
 		}
 	}
@@ -359,14 +386,29 @@ struct Engine {
 		float pre = 1.f + 15.f * c.drive * c.drive;
 		const float S = 5.f;  // clip headroom in model units
 		float post = S / std::sqrt(pre);
-		float gL = c.tone > 0.f ? 1.f - c.tone : 1.f;
-		float gH = c.tone < 0.f ? 1.f + c.tone : 1.f;
+		float g[3];
+		float clipMix = 1.f;
+		if (c.classic) {
+			// crossfade: low path against the two higher paths
+			g[0] = c.tone > 0.f ? 1.f - c.tone : 1.f;
+			g[1] = g[2] = c.tone < 0.f ? 1.f + c.tone : 1.f;
+		}
+		else {
+			// the 808's TONE mostly turns the top path up or down (+-18 dB)
+			// and nudges the other two the opposite way (+-2 dB)
+			g[2] = std::pow(10.f, c.tone * 18.f / 20.f);
+			g[0] = g[1] = std::pow(10.f, -c.tone * 2.f / 20.f);
+			// the clip fades in over the first eighth of DRIVE: none at 0
+			clipMix = std::min(c.drive * 8.f, 1.f);
+		}
 		float out = 0.f;
 		for (int b = 0; b < 3; b++) {
 			float v = (float) bp * env[b] * accent;
-			v = softClip(v * pre / S) * post;
-			out += (float) hpf[b].process(v) * (b == 0 ? gL : gH);
+			float cl = softClip(v * pre / S) * post;
+			v += clipMix * (cl - v);
+			out += (float) hpf[b].process(v) * g[b];
 		}
+		if (!c.classic) out = (float) tilt.process(out);
 		return out * c.level * OUT_GAIN;
 	}
 };

@@ -36,6 +36,11 @@ The engine runs at twice the host sample rate so the high band and the resonant 
 | | LEVEL, HIT | output level, manual trigger |
 | Gates | TRIG, ACCENT, CHOKE | trigger; accent voltage sampled at each trigger (10 V = +3 dB and more clip); a trigger at CHOKE cuts the sound in 3 ms |
 
+Voicing: since 2.3 the DECAY knob only lengthens the first path, TONE mainly moves the top path, the output stage rises 6 dB/octave
+(shelf, estimated corner frequencies) and the clip is fully off at DRIVE 0, following Werner, Abel & Smith, "The TR-808 Cymbal" (ICMC 2014).
+The paper gives no part values for the fixed decays or the output stage, so those are estimates. Right-click *Classic voicing* restores the
+2.0-2.2 behaviour; patches saved before 2.3 load with it on.
+
 Right-click: *One envelope for all three paths* (the original post's behaviour) and *Reset to the pure model*.
 
 ## Building

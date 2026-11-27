@@ -65,14 +65,16 @@ the <b>DECAY</b> knob to match the 808's own ranges.</p>
 <tr><td>BAND</td><td>Balance between the 3.4 kHz filter (left, body) and the 7.1 kHz filter (right, sizzle). Turn it right for a classic 808 hat.</td></tr>
 <tr><td>CUT + CV</td><td>Moves the highpass filters. Down lets more body through; up leaves only the air.</td></tr>
 <tr><td>EXT IN / OSC OUT</td><td>Any audio patched to EXT IN replaces the six oscillators, so the filters and VCAs work on your sound. OSC OUT gives you the raw six-oscillator chord.</td></tr>
-<tr><td>DECAY + CV</td><td>How long the hit rings. CH 20-150 ms, OH 0.09-0.6 s, CY 0.35-1.2 s. ±5 V on the CV covers the whole range.</td></tr>
-<tr><td>TONE + CV</td><td>The 808 cymbal splits into a low path with a long decay and two higher paths that die sooner. Left keeps the long low wash; right keeps the short bright tick.</td></tr>
-<tr><td>DRIVE + CV</td><td>Pushes the VCAs into their soft clipping, which the real circuit does too. Thicker, rougher, louder transient.</td></tr>
+<tr><td>DECAY + CV</td><td>How long the hit rings. CH 20-150 ms, OH 0.09-0.6 s, CY 0.35-1.2 s. ±5 V on the CV covers the whole range. As on the 808, in OH and CY the knob only lengthens the first of the three paths (the body); the two brighter paths always die away quickly.</td></tr>
+<tr><td>TONE + CV</td><td>As on the 808, this mostly turns the top path up or down (the short, bright tick at the start of each hit). Left is darker and smoother; right is brighter with a sharper attack.</td></tr>
+<tr><td>DRIVE + CV</td><td>Pushes the VCAs into their soft clipping, which the real circuit does too. Thicker, rougher, louder transient. At zero the VCAs are completely clean.</td></tr>
 <tr><td>LEVEL / HIT</td><td>Output level, and a button that plays a hit (it lights up with the envelope).</td></tr>
 <tr><td>ACCENT</td><td>Read at each trigger: 0 V plays normally, 10 V plays about 3 dB louder and hits the clipping harder, like the 808's accent.</td></tr>
 <tr><td>CHOKE</td><td>A trigger here cuts the sound off in 3 ms. Use it so a closed hat stops an open hat.</td></tr>
 </table>
-<p class="small">Right-click menu: <i>One envelope for all three paths</i> plays it exactly as in mjsyts' post (one shared decay).
+<p class="small">Right-click menu: <i>Classic voicing</i> brings back how versions 2.0 to 2.2 sounded: DECAY stretches all three paths,
+TONE crossfades the low path against the high ones, and there is no output brightening. Patches saved with those versions switch it on by themselves.
+<i>One envelope for all three paths</i> plays it exactly as in mjsyts' post (one shared decay).
 <i>Reset to the pure model</i> puts every sound-shaping knob back to the circuit.</p>
 
 <h2 class="break">Recipes</h2>
@@ -104,6 +106,10 @@ The 808's filters and VCAs chop it into metallic hats. With a loop on EXT IN and
 "808-ified" version of the loop.</div>
 
 <h2>Notes</h2>
+<p class="small">How close is it to the real thing? The oscillators and all the filters use values worked out from the schematic.
+The VCA order, the DECAY and TONE behaviour and the brightening output stage follow Werner, Abel and Smith's paper
+<i>"The TR-808 Cymbal: a Physically-Informed, Circuit-Bendable, Digital Model"</i> (ICMC 2014). That paper gives no part values for
+the two fixed decays or the output stage, so those are set by estimate.</p>
 <p class="small">Levels: peaks reach about 7.5 V at default settings. Above 8 V a gentle limiter rounds the peaks off.
 OSC OUT is about ±4.5 V. The engine runs at twice your sample rate (oversampled), so the highest filters stay accurate.
 CPU use is tiny (well under 1 % of one core).</p>

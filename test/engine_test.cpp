@@ -69,9 +69,10 @@ int main() {
 	if (system("mkdir -p test/out")) return 1;
 	const int sr = 48000;
 	const char* names[3] = {"closed-hat", "open-hat", "cymbal"};
+	for (int v = 0; v < 2; v++)
 	for (int m = 0; m < 3; m++) {
 		Engine e; e.setSampleRate(sr);
-		Controls c; c.mode = m; c.decay = 0.5f;
+		Controls c; c.mode = m; c.decay = 0.5f; c.classic = v == 1;
 		std::vector<float> out;
 		double peak = 0, sumsq = 0; bool nan = false;
 		for (int hit = 0; hit < 4; hit++) {
@@ -86,11 +87,11 @@ int main() {
 		}
 		float tail = 0;
 		for (int i = out.size() - 2000; i < (int) out.size(); i++) tail = std::max(tail, std::fabs(out[i]));
-		printf("%-10s peak %.2f V, tail %.5f\n", names[m], peak, tail);
+		printf("%-8s %-10s peak %.2f V, rms %.2f, tail %.5f\n", v ? "classic" : "circuit", names[m], peak, std::sqrt(sumsq / out.size()), tail);
 		CHECK(!nan, "NaN in %s", names[m]);
 		CHECK(peak > 3.0 && peak < 10.0, "%s peak %.2f out of range", names[m], peak);
 		CHECK(tail < 0.01, "%s does not die away (%.4f)", names[m], tail);
-		writeWav(std::string("test/out/") + names[m] + ".wav", out, sr);
+		writeWav(std::string("test/out/") + (v ? "classic-" : "circuit-") + names[m] + ".wav", out, sr);
 	}
 
 	// extreme settings stay finite and bounded
@@ -133,6 +134,18 @@ int main() {
 		}
 		printf("osc zero crossings at 0 V: %d, at +1 V: %d\n", zc[0], zc[1]);
 		CHECK(zc[1] > zc[0] * 1.7, "V/OCT does not shift the oscillators");
+	}
+	// circuit voicing: with DRIVE at 0 the VCAs are exactly linear (half the input = half the output)
+	{
+		float pk[2];
+		for (int k = 0; k < 2; k++) {
+			Engine e; e.setSampleRate(48000); Controls c; c.useExt = true; float p = 0;
+			e.trigger(1.f);
+			for (int i = 0; i < 4800; i++) { c.ext = (k ? 0.5f : 1.f) * std::sin(2 * PI * 7000.0 * i / 48000.0); p = std::max(p, std::fabs(e.process(c))); }
+			pk[k] = p;
+		}
+		printf("linearity at DRIVE 0: %.4f (want 2)\n", pk[0] / pk[1]);
+		CHECK(std::fabs(pk[0] / pk[1] - 2.f) < 0.01f, "clip not transparent at DRIVE 0");
 	}
 	// choke
 	{

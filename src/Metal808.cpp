@@ -55,6 +55,7 @@ struct Metal808 : Module {
 	dsp::SchmittTrigger trigIn, chokeIn, hitButton;
 	dsp::ClockDivider lightDivider;
 	bool oneEnvelope = false;
+	bool classic = false;  // 2.0-2.2 voicing; patches saved before 2.3 load with it on
 
 	struct ModeQuantity : ParamQuantity {
 		std::string getDisplayValueString() override {
@@ -79,7 +80,7 @@ struct Metal808 : Module {
 		configParam(DECAY_PARAM, 0.f, 1.f, 0.5f, "Decay (range set by MODE)", "%", 0.f, 100.f);
 		configParam<ModeQuantity>(MODE_PARAM, 0.f, 2.f, 2.f, "Mode");
 		getParamQuantity(MODE_PARAM)->snapEnabled = true;
-		configParam(TONE_PARAM, -1.f, 1.f, 0.f, "Tone (low path <-> high paths)");
+		configParam(TONE_PARAM, -1.f, 1.f, 0.f, "Tone (darker <-> brighter)");
 		configParam(DRIVE_PARAM, 0.f, 1.f, 0.f, "Drive (VCA clipping)", "%", 0.f, 100.f);
 		configParam(LEVEL_PARAM, 0.f, 1.f, 1.f, "Level", "%", 0.f, 100.f)->randomizeEnabled = false;
 		configButton(HIT_PARAM, "Hit");
@@ -123,6 +124,7 @@ struct Metal808 : Module {
 		ctl.drive = clamp(params[DRIVE_PARAM].getValue() + inputs[DRIVE_INPUT].getVoltage() * 0.1f, 0.f, 1.f);
 		ctl.level = params[LEVEL_PARAM].getValue();
 		ctl.oneEnvelope = oneEnvelope;
+		ctl.classic = classic;
 		ctl.useExt = inputs[EXT_INPUT].isConnected();
 		ctl.ext = inputs[EXT_INPUT].getVoltage();
 
@@ -149,12 +151,16 @@ struct Metal808 : Module {
 	json_t* dataToJson() override {
 		json_t* root = json_object();
 		json_object_set_new(root, "oneEnvelope", json_boolean(oneEnvelope));
+		json_object_set_new(root, "classic", json_boolean(classic));
 		return root;
 	}
 
 	void dataFromJson(json_t* root) override {
 		json_t* j;
 		if ((j = json_object_get(root, "oneEnvelope"))) oneEnvelope = json_boolean_value(j);
+		// no "classic" entry = a patch from before 2.3: keep the sound it was made with
+		j = json_object_get(root, "classic");
+		classic = j ? json_boolean_value(j) : true;
 	}
 };
 
@@ -202,6 +208,7 @@ struct Metal808Widget : ModuleWidget {
 		if (!module)
 			return;
 		menu->addChild(new MenuSeparator);
+		menu->addChild(createBoolPtrMenuItem("Classic voicing (how versions 2.0 to 2.2 sounded)", "", &module->classic));
 		menu->addChild(createBoolPtrMenuItem("One envelope for all three paths (as in the original post)", "", &module->oneEnvelope));
 		menu->addChild(createMenuItem("Reset to the pure model", "", [=]() {
 			for (int p : {Metal808::TUNE_PARAM, Metal808::TRIMA_PARAM, Metal808::TRIMB_PARAM, Metal808::SPREAD_PARAM,
